@@ -5,7 +5,7 @@ exports.amountTransfers = async (req, res) => {
   //1.recibir el monto , acconutNumber enviamos el id de quien hace la transferencia = req.body
   const { amount, accountNumber, senderUserId } = req.body;
   //2.userReceiver buscar el usuario que va a recibir el monto donde el status sea true donde el account number = accountnumber
-  const userReceiver = await Transfers.findOne({
+  const userReceiver = await Users.findOne({
     where: {
       status: true,
       accountNumber: accountNumber,
