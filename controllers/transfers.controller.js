@@ -1,58 +1,71 @@
 const Transfers = require('../models/transfers.model');
-const Users = require('../models/users.model');
+const AppError = require('../utils/appError');
+const catchAsync = require('../utils/catchAsync');
 
-exports.amountTransfers = async (req, res) => {
-  //1.recibir el monto , acconutNumber enviamos el id de quien hace la transferencia = req.body
-  const { amount, accountNumber, senderUserId } = req.body;
-  //2.userReceiver buscar el usuario que va a recibir el monto donde el status sea true donde el account number = accountnumber
-  const userReceiver = await Users.findOne({
-    where: {
-      status: true,
-      accountNumber: accountNumber,
-    },
-  });
-  //3.crear una constante que se llame reciverUserId = userReceiver.id
-  const receiverUserId = userReceiver.id;
-  //4.buscar al usuario que va a ser la tranferencia
-  const userMakeTransfer = await Users.findOne({
-    where: {
-      status: true,
-      id: senderUserId,
-    },
-  });
-  //5 verificar si el monto a transferir es mayor al monto que tiene el userMakeTransfers enviar error 400
-  if (amount > userMakeTransfer.amount) {
-    return res.status(400).json({
-      status: 'error',
-      message:
-        'The sending account does not have the amount necessary to make the transfer.',
-    });
+exports.sendTransfer = catchAsync(async (req, res, next) => {
+  // 1. recibir por la req.body lo que vamos a recibir en la peticion.
+  const { amount, senderUserId } = req.body;
+
+  // 2. Recibir por la req las variables enviadas desde las validaciones.
+  const {
+    receiverUserId,
+    amountSenderUser,
+    userReceiberTransfer,
+    userSenderTransfer,
+  } = req;
+
+  // 3. verificar que el monto enviado no sea mayor al monto de la cuenta del usuario.
+  if (amount > amountSenderUser) {
+    return next(
+      new AppError(
+        'The amount entered is greater than your current balance.',
+        400
+      )
+    );
   }
-  //6. verificar si el id del usuario que recibe es igual al id del usuario que envia, enviar un error
-  if (receiverUserId == senderUserId) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'Cannot self-make a transfer',
-    });
+
+  // tambien verificar que el monto enviado no sea menor al monto de la cuenta del usuario.
+  if (amountSenderUser < amount) {
+    return next(
+      new AppError(
+        'Please enter a higher amount to continue with the operation.',
+        400
+      )
+    );
   }
-  //7 crear una constante que se llame newAmountUserMakeTransfer(tendra el resultado de la resta de monto de usuario - el monto se recibe de la req.body)
-  const newAmountUserMakeTransfer = userMakeTransfer.amount - amount;
-  //8 crear una constante que se llame newAmountUserReceiver(tendta el result de la suma entre el monto que tiene el usuario en la cuenta mas el monto que se recibe del req.body)
-  const newAmountUserReceiver = userReceiver.amount + amount;
-  //9 actualizar la informacion del usuario que envia con su nuevo amount
-  await userMakeTransfer.update({ amount: newAmountUserMakeTransfer });
-  //10 actualizar la informacion del usuario que recibe con su nuevo amount
-  await userReceiver.update({ amount: newAmountUserReceiver });
-  //11 guardar o crear la tranferesncia en la base de datos
-  const transferSuccess = await Transfers.create({
+
+  // 4. Verificar  que el ID del que envia no sea igual al ID que recibe.
+  if (receiverUserId === senderUserId) {
+    return next(new AppError('Cant send money to your same account', 400));
+  }
+
+  // 5. crear una  variable para almacenar el nuevo monto del usuario que ENVIA
+  const newAmountMakeTransfer = userSenderTransfer.amount - amount;
+
+  // 6.crear una  variable para almacenar el nuevo monto del usuario que RECIBE.
+  const newAmountUserReceiver = userReceiberTransfer.amount + amount;
+
+  // 7. ctualizar la informacion del usuario con el nuevo monto q le quedo despues que RECIBIO la transferencia
+  await userReceiberTransfer.update({
+    amount: newAmountUserReceiver,
+  });
+
+  //  8. actualizar la informacion del usuario con el nuevo monto q le quedo despues que ENVIO la transferencia
+  await userSenderTransfer.update({
+    amount: newAmountMakeTransfer,
+  });
+
+  // 9. registrar en nuestra base de datos la tranferencia
+  const newTransfer = await Transfers.create({
     amount,
     senderUserId,
     receiverUserId,
   });
-  //12 enviar la respuesta al cliente que diga que la tranferencia se hizo exitosamnete
-  return res.status(200).json({
-    status: 'success',
-    message: 'Transfer was done successfully',
-    transferSuccess,
+
+  // 10. enviar la respuesta al cliente que diga que la tranferencia se hizo exitosamente
+  res.status(200).json({
+    status: 'sucess',
+    message: 'Successful transfer',
+    newTransfer,
   });
-};
+});

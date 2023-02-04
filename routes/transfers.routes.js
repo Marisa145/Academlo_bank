@@ -1,9 +1,18 @@
 const { Router } = require('express');
-const { amountTransfers } = require('../controllers/transfers.controller');
+const { sendTransfer } = require('../controllers/transfers.controller');
+const {
+  validUserSenderTransfer,
+  validUserReceiberTransfer,
+} = require('../middleware/validateAmount');
 
 const router = Router();
 
-router.post('/', amountTransfers);
+router.post(
+  '/',
+  validUserReceiberTransfer,
+  validUserSenderTransfer,
+  sendTransfer
+);
 
 module.exports = {
   transfersRouter: router,

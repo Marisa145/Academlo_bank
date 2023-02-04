@@ -1,17 +1,12 @@
 const { Router } = require('express');
-const {
-  historyUser,
-  signupUser,
-  loginUser,
-} = require('../controllers/users.controller');
+const { signupUser, loginUser } = require('../controllers/users.controller');
+const { validateAccount } = require('../middleware/verifyAccount');
 
 const router = Router();
 
 router.post('/signup', signupUser);
 
-router.post('/login', loginUser);
-
-router.get('/:id/history', historyUser);
+router.post('/login', validateAccount, loginUser);
 
 module.exports = {
   usersRouter: router,
